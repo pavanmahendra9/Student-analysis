@@ -1,6 +1,6 @@
 # Student Performance Dashboard
 
-A local student-performance website built with Next.js, TypeScript, Prisma, and SQLite. The dashboard manages students, subjects, marks, and reports. Data is saved in a local SQLite database, so no MySQL server or browser-local storage is required.
+A student-performance website built with Next.js, TypeScript, Prisma, and SQLite/libSQL. The dashboard manages students, subjects, marks, and reports. Use local SQLite for development or a hosted libSQL database for deployments such as Vercel.
 
 ## Requirements
 
@@ -42,6 +42,22 @@ DATABASE_URL="file:./prisma/dev.db"
 
 The SQLite file is `prisma/dev.db`. Change `DATABASE_URL` if you want to use another supported Prisma database.
 
+## Deploy to Vercel
+
+Vercel's function filesystem is temporary and cannot be used for persistent SQLite records. For a Vercel deployment, connect the app to a hosted libSQL database such as Turso:
+
+1. Create a Turso database and generate a database URL and auth token.
+2. In your Vercel project's **Settings → Environment Variables**, set `DATABASE_URL` to the database URL (for example, `libsql://<database-name>-<organization>.turso.io`) and `TURSO_AUTH_TOKEN` to the generated token. Add them to every Vercel environment where the app should work, then redeploy.
+3. Push the Prisma schema to the remote database once. From PowerShell in the project folder, set the same values and run:
+
+   ```powershell
+   $env:DATABASE_URL = "libsql://<database-name>-<organization>.turso.io"
+   $env:TURSO_AUTH_TOKEN = "<your-auth-token>"
+   npx prisma db push
+   ```
+
+Keep the auth token private and do not commit it. The default `file:./prisma/dev.db` URL is for local development only; it must not be used as Vercel's production database. The app reads `TURSO_AUTH_TOKEN` when connecting to a token-protected libSQL database; it is not needed for local SQLite.
+
 ## Features
 
 - Overview with class averages, top performers, and recent marks
@@ -51,4 +67,4 @@ The SQLite file is `prisma/dev.db`. Change `DATABASE_URL` if you want to use ano
 - Responsive dashboard layout
 - Prisma-backed API routes under `/api/`
 
-Deleting a student or subject also deletes its related marks. The SQLite database is local to this project and is not shared between machines.
+Deleting a student or subject also deletes its related marks. Locally, SQLite data is stored in `prisma/dev.db`; on Vercel, data persists in the configured hosted database.

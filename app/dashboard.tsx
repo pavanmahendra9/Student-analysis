@@ -208,10 +208,10 @@ export default function Dashboard() {
         <nav className="main-nav" aria-label="Main navigation">
           {navigation.map((item) => <button className={`nav-item ${view === item.id ? "active" : ""}`} key={item.id} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
         </nav>
-        <div className="sidebar-bottom"><span className="status-dot" /><div><strong>SQLite database</strong><small>Saved on this computer</small></div></div>
+        <div className="sidebar-bottom"><span className="status-dot" /><div><strong>Connected database</strong><small>Configured storage</small></div></div>
       </aside>
       <main className="main-content">
-        <header className="topbar"><div className="breadcrumbs">Workspace <span>/</span> <strong>{activeLabel}</strong></div><div className="topbar-right"><span className="local-badge"><span className="status-dot" /> Prisma · SQLite</span><div className="avatar" aria-label="Teacher">T</div></div></header>
+        <header className="topbar"><div className="breadcrumbs">Workspace <span>/</span> <strong>{activeLabel}</strong></div><div className="topbar-right"><span className="local-badge"><span className="status-dot" /> Prisma database</span><div className="avatar" aria-label="Teacher">T</div></div></header>
         <div className="content-wrap">
           {error && <div className="error-banner" role="alert">{error}<button onClick={() => reload().catch((cause: unknown) => setError(String(cause)))}>Retry</button></div>}
           {loading ? <div className="loading-state">Loading your class…</div> : <>
@@ -291,7 +291,7 @@ export default function Dashboard() {
               </div>
             </>}
           </>}
-          <footer className="footer-note"><span className="status-dot" /> Your class data is stored locally in the SQLite database.</footer>
+          <footer className="footer-note"><span className="status-dot" /> Your class data is saved to the connected database.</footer>
         </div>
       </main>
       <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">{toast}</div>
