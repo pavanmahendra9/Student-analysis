@@ -1,20 +1,21 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 
-type Student = { id: number; rollNo: string; name: string; section: string };
-type Subject = { id: number; subjectName: string; maxMarks: number; passMarks: number };
-type Mark = {
-  id: number;
-  studentId: number;
-  subjectId: number;
-  assessment: string;
-  marksObtained: number;
-  createdAt: string;
-  student: { name: string; rollNo: string; section: string };
-  subject: { subjectName: string; maxMarks: number; passMarks: number };
-};
-type DashboardData = { students: Student[]; subjects: Subject[]; marks: Mark[] };
+import {
+  addMark as addMarkToData,
+  addStudent as addStudentToData,
+  addSubject as addSubjectToData,
+  deleteMark,
+  deleteStudent,
+  deleteSubject,
+  emptyData,
+  loadDashboardData,
+  saveDashboardData,
+} from "@/lib/dashboard-data";
+import type { DashboardData, Mark, Student, Subject } from "@/lib/dashboard-data";
+
 type View = "overview" | "students" | "subjects" | "marks" | "reports";
 
 const navigation: { id: View; icon: string; label: string }[] = [
@@ -25,24 +26,8 @@ const navigation: { id: View; icon: string; label: string }[] = [
   { id: "reports", icon: "▥", label: "Reports" },
 ];
 
-const emptyData: DashboardData = { students: [], subjects: [], marks: [] };
 const fmt = (value: number) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 });
 const getGrade = (value: number) => value >= 90 ? "A" : value >= 80 ? "B" : value >= 70 ? "C" : value >= 60 ? "D" : value >= 40 ? "E" : "F";
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = body && typeof body === "object" && "error" in body && typeof body.error === "string"
-      ? body.error
-      : `Request failed (${response.status}).`;
-    throw new Error(message);
-  }
-  return body as T;
-}
 
 function initials(name: string) {
   return name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
@@ -97,8 +82,8 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
-  const reload = useCallback(async () => {
-    const result = await requestJson<DashboardData>("/api/dashboard", { cache: "no-store" });
+  const reload = useCallback(() => {
+    const result = loadDashboardData(window.localStorage);
     setData(result);
     setSelectedSubjectId((current) =>
       result.subjects.some((subject) => String(subject.id) === current)
@@ -109,9 +94,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    reload()
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not load dashboard data."))
-      .finally(() => setLoading(false));
+    try {
+      reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load saved class data.");
+    } finally {
+      setLoading(false);
+    }
   }, [reload]);
 
   useEffect(() => {
@@ -134,10 +123,17 @@ export default function Dashboard() {
     `${student.name} ${student.rollNo} ${student.section}`.toLowerCase().includes(search.trim().toLowerCase()),
   );
 
-  async function mutate(url: string, init: RequestInit, successMessage: string) {
+  function mutate(update: (current: DashboardData) => DashboardData, successMessage: string) {
     try {
-      await requestJson<unknown>(url, init);
-      await reload();
+      const updated = update(data);
+      saveDashboardData(window.localStorage, updated);
+      setData(updated);
+      setSelectedSubjectId((current) =>
+        updated.subjects.some((subject) => String(subject.id) === current)
+          ? current
+          : String(updated.subjects[0]?.id ?? ""),
+      );
+      setError("");
       setToast(successMessage);
       return true;
     } catch (cause) {
@@ -148,42 +144,41 @@ export default function Dashboard() {
     }
   }
 
-  async function addStudent(event: FormEvent<HTMLFormElement>) {
+  function addStudent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const saved = await mutate("/api/students", {
-      method: "POST",
-      body: JSON.stringify({ rollNo: form.get("rollNo"), name: form.get("name"), section: form.get("section") }),
-    }, "Student added to your class.");
+    const saved = mutate((current) => addStudentToData(current, {
+      rollNo: form.get("rollNo"),
+      name: form.get("name"),
+      section: form.get("section"),
+    }), "Student added to your class.");
     if (saved) formElement.reset();
   }
 
-  async function addSubject(event: FormEvent<HTMLFormElement>) {
+  function addSubject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const saved = await mutate("/api/subjects", {
-      method: "POST",
-      body: JSON.stringify({ subjectName: form.get("subjectName"), maxMarks: form.get("maxMarks"), passMarks: form.get("passMarks") }),
-    }, "Subject added.");
+    const saved = mutate((current) => addSubjectToData(current, {
+      subjectName: form.get("subjectName"),
+      maxMarks: form.get("maxMarks"),
+      passMarks: form.get("passMarks"),
+    }), "Subject added.");
     if (saved) formElement.reset();
   }
 
-  async function addMark(event: FormEvent<HTMLFormElement>) {
+  function addMark(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const subjectId = String(form.get("subjectId") ?? "");
-    const saved = await mutate("/api/marks", {
-      method: "POST",
-      body: JSON.stringify({
-        studentId: form.get("studentId"),
-        subjectId: form.get("subjectId"),
-        assessment: form.get("assessment"),
-        marksObtained: form.get("marksObtained"),
-      }),
-    }, "Assessment marks saved.");
+    const saved = mutate((current) => addMarkToData(current, {
+      studentId: form.get("studentId"),
+      subjectId: form.get("subjectId"),
+      assessment: form.get("assessment"),
+      marksObtained: form.get("marksObtained"),
+    }), "Assessment marks saved.");
     if (saved) {
       const assessment = formElement.elements.namedItem("assessment");
       const marksObtained = formElement.elements.namedItem("marksObtained");
@@ -193,9 +188,16 @@ export default function Dashboard() {
     }
   }
 
-  async function remove(url: string, label: string) {
-    if (!window.confirm(`Delete this ${label}? This also deletes its related marks.`)) return;
-    await mutate(url, { method: "DELETE" }, `${label[0].toUpperCase()}${label.slice(1)} deleted.`);
+  function remove(kind: "student" | "subject" | "mark", id: number) {
+    const label = kind;
+    const relatedMarksWarning = kind === "mark" ? "" : " This also deletes its related marks.";
+    if (!window.confirm(`Delete this ${label}?${relatedMarksWarning}`)) return;
+    const update = kind === "student"
+      ? (current: DashboardData) => deleteStudent(current, id)
+      : kind === "subject"
+        ? (current: DashboardData) => deleteSubject(current, id)
+        : (current: DashboardData) => deleteMark(current, id);
+    mutate(update, `${label[0].toUpperCase()}${label.slice(1)} deleted.`);
   }
 
   const activeLabel = navigation.find((item) => item.id === view)?.label ?? "Overview";
@@ -208,12 +210,18 @@ export default function Dashboard() {
         <nav className="main-nav" aria-label="Main navigation">
           {navigation.map((item) => <button className={`nav-item ${view === item.id ? "active" : ""}`} key={item.id} onClick={() => setView(item.id)}><span>{item.icon}</span>{item.label}</button>)}
         </nav>
-        <div className="sidebar-bottom"><span className="status-dot" /><div><strong>Connected database</strong><small>Configured storage</small></div></div>
+        <div className="sidebar-bottom"><span className="status-dot" /><div><strong>Browser storage</strong><small>Saved in this browser</small></div></div>
       </aside>
       <main className="main-content">
-        <header className="topbar"><div className="breadcrumbs">Workspace <span>/</span> <strong>{activeLabel}</strong></div><div className="topbar-right"><span className="local-badge"><span className="status-dot" /> Prisma database</span><div className="avatar" aria-label="Teacher">T</div></div></header>
+        <header className="topbar"><div className="breadcrumbs">Workspace <span>/</span> <strong>{activeLabel}</strong></div><div className="topbar-right"><span className="local-badge"><span className="status-dot" /> Local browser data</span><div className="avatar" aria-label="Teacher">T</div></div></header>
         <div className="content-wrap">
-          {error && <div className="error-banner" role="alert">{error}<button onClick={() => reload().catch((cause: unknown) => setError(String(cause)))}>Retry</button></div>}
+          {error && <div className="error-banner" role="alert">{error}<button onClick={() => {
+            try {
+              reload();
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : "Could not load saved class data.");
+            }
+          }}>Retry</button></div>}
           {loading ? <div className="loading-state">Loading your class…</div> : <>
             {view === "overview" && <>
               <div className="page-heading"><div><p className="eyebrow">YOUR CLASS AT A GLANCE</p><h1>Overview</h1><p className="subheading">Track student progress and keep your class organized.</p></div><button className="button button-primary" onClick={() => setView("marks")}>＋ Add marks</button></div>
@@ -241,7 +249,7 @@ export default function Dashboard() {
                   {!visibleStudents.length ? <Empty>No students found. Add a student to get started.</Empty> : <TableWrap><table><thead><tr><th>STUDENT</th><th>ROLL NO.</th><th>SECTION</th><th>AVERAGE</th><th>GRADE</th><th /></tr></thead><tbody>
                     {visibleStudents.map((student) => {
                       const stats = scoreFor(student.id, data.marks);
-                      return <tr key={student.id}><td><span className="student-cell"><span className="mini-avatar">{initials(student.name)}</span>{student.name}</span></td><td>{student.rollNo}</td><td><span className="section-pill">{student.section}</span></td><td>{stats.records.length ? `${fmt(stats.percentage)}%` : "—"}</td><td>{stats.records.length ? <span className="grade-pill">{getGrade(stats.percentage)}</span> : "—"}</td><td><button className="delete-button" onClick={() => remove(`/api/students/${student.id}`, "student")} aria-label={`Delete ${student.name}`}>×</button></td></tr>;
+                      return <tr key={student.id}><td><span className="student-cell"><span className="mini-avatar">{initials(student.name)}</span>{student.name}</span></td><td>{student.rollNo}</td><td><span className="section-pill">{student.section}</span></td><td>{stats.records.length ? `${fmt(stats.percentage)}%` : "—"}</td><td>{stats.records.length ? <span className="grade-pill">{getGrade(stats.percentage)}</span> : "—"}</td><td><button className="delete-button" onClick={() => remove("student", student.id)} aria-label={`Delete ${student.name}`}>×</button></td></tr>;
                     })}
                   </tbody></table></TableWrap>}
                 </article>
@@ -258,7 +266,7 @@ export default function Dashboard() {
                     {data.subjects.map((subject) => {
                       const entries = data.marks.filter((mark) => mark.subjectId === subject.id);
                       const average = entries.length ? entries.reduce((sum, mark) => sum + mark.marksObtained, 0) / entries.length : null;
-                      return <tr key={subject.id}><td><span className="student-cell">{subject.subjectName}</span></td><td>{fmt(subject.maxMarks)}</td><td>{fmt(subject.passMarks)}</td><td>{average === null ? "—" : fmt(average)}</td><td><button className="delete-button" onClick={() => remove(`/api/subjects/${subject.id}`, "subject")} aria-label={`Delete ${subject.subjectName}`}>×</button></td></tr>;
+                      return <tr key={subject.id}><td><span className="student-cell">{subject.subjectName}</span></td><td>{fmt(subject.maxMarks)}</td><td>{fmt(subject.passMarks)}</td><td>{average === null ? "—" : fmt(average)}</td><td><button className="delete-button" onClick={() => remove("subject", subject.id)} aria-label={`Delete ${subject.subjectName}`}>×</button></td></tr>;
                     })}
                   </tbody></table></TableWrap>}
                 </article>
@@ -274,7 +282,7 @@ export default function Dashboard() {
                 <button className="button button-primary" type="submit" disabled={!data.students.length || !data.subjects.length}>Save marks</button>
               </form></article>
               <article className="card table-card"><div className="card-heading"><CardHeading title="Assessment records" subtitle={`${data.marks.length} records`} /></div>
-                <MarksTable marks={data.marks} onDelete={(id) => remove(`/api/marks/${id}`, "mark")} />
+                <MarksTable marks={data.marks} onDelete={(id) => remove("mark", id)} />
               </article>
             </>}
             {view === "reports" && <>
@@ -291,7 +299,7 @@ export default function Dashboard() {
               </div>
             </>}
           </>}
-          <footer className="footer-note"><span className="status-dot" /> Your class data is saved to the connected database.</footer>
+          <footer className="footer-note"><span className="status-dot" /> Your records stay in this browser only. Clearing this site's data will delete them.</footer>
         </div>
       </main>
       <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">{toast}</div>

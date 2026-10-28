@@ -1,6 +1,6 @@
 # Student Performance Dashboard
 
-A student-performance website built with Next.js, TypeScript, Prisma, and Prisma Accelerate. The dashboard manages students, subjects, marks, and reports using a PostgreSQL database.
+A student-performance dashboard built with Next.js and TypeScript. It manages students, subjects, marks, and reports entirely in the browser, with no database or server-side API required.
 
 ## Requirements
 
@@ -12,52 +12,28 @@ A student-performance website built with Next.js, TypeScript, Prisma, and Prisma
 Open PowerShell in this project folder and run:
 
 ```powershell
-npm install
-npm run db:setup
-npm run dev
+npm.cmd install
+npm.cmd run dev
 ```
 
-Set `DATABASE_URL` to your Prisma Accelerate URL and `DIRECT_URL` to the direct PostgreSQL connection URL in `.env` before setting up the database. Then open <http://127.0.0.1:5000/>. Running `npm run db:setup` creates the schema and seeds sample students, subjects, and marks if the database is empty.
+Open <http://127.0.0.1:5000/>. No database or environment variables are needed.
 
-To run the production build:
+To run tests and build the static site:
 
 ```powershell
-npm run build
-npm start
+npm.cmd test
+npm.cmd run build
 ```
 
-Run the API smoke test while the site is running:
-
-```powershell
-npm run test:api
-```
-
-## Database
-
-The Prisma schema is in `prisma/schema.prisma`. Configure both URLs:
-
-```env
-DATABASE_URL="prisma://accelerate.prisma-data.net/?api_key=YOUR_API_KEY"
-DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
-```
-
-`DATABASE_URL` is the Prisma Accelerate URL used by the app at runtime. `DIRECT_URL` is a direct PostgreSQL connection used by Prisma CLI schema operations such as `db push`; it must not be a `prisma://` Accelerate URL.
+The static site is generated in `out`.
 
 ## Deploy to Vercel
 
-Configure the project to use Prisma Accelerate and a direct database connection:
+Import the repository into Vercel and deploy with the default Next.js build command, `npm run build`. Next.js exports a static site to `out`; no database, Vercel storage integration, or environment variables need to be configured.
 
-1. In Vercel **Settings → Environment Variables**, set `DATABASE_URL` to the `prisma://` URL and `DIRECT_URL` to the direct PostgreSQL URL provided by your database/Prisma setup. Add them to every environment where the app should work.
-2. Push the schema using the direct PostgreSQL URL. From PowerShell in the project folder, run:
+## Record storage
 
-   ```powershell
-   $env:DIRECT_URL = "postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
-   npx prisma db push
-   ```
-
-Use your actual URLs and keep them private; do not commit them. For the app, `DATABASE_URL` must use the Prisma Accelerate `prisma://` scheme. For `db:push`, set `DIRECT_URL` to the corresponding direct PostgreSQL connection URL (not the Accelerate URL). Redeploy after setting the environment variables and pushing the schema.
-
-This project currently pins Prisma `8.1.0-dev.9`, a prerelease selected because the deployment platform requires Prisma 8. The npm configuration allows its prerelease peer dependency range with Prisma Accelerate; upgrade to a stable Prisma 8 release once one is published.
+Records are saved in the current browser's local storage. They remain available in that browser after reloads, but are not shared across browsers or devices. Clearing the browser's site data deletes the saved records. This app does not upload class data to a server.
 
 ## Features
 
@@ -66,6 +42,6 @@ This project currently pins Prisma `8.1.0-dev.9`, a prerelease selected because 
 - Assessment mark entry with mark-range validation and duplicate detection
 - Reports with subject averages, student rankings, grades, and pass status
 - Responsive dashboard layout
-- Prisma-backed API routes under `/api/`
+- Browser-local record management without an API or database
 
-Deleting a student or subject also deletes its related marks. Data persists in the PostgreSQL database configured by Prisma Accelerate.
+Deleting a student or subject also deletes its related marks from this browser's saved records.

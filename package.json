@@ -5,17 +5,9 @@
   "scripts": {
     "dev": "next dev --webpack --hostname 127.0.0.1 --port 5000",
     "build": "next build --webpack",
-    "start": "next start --hostname 127.0.0.1 --port 5000",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "prisma db push && tsx prisma/seed.ts",
-    "test:api": "node --test tests/api.test.mjs",
-    "postinstall": "prisma generate"
+    "test": "tsx --test tests/dashboard-data.test.ts"
   },
   "dependencies": {
-    "@prisma/client": "8.1.0-dev.9",
-    "@prisma/extension-accelerate": "3.0.1",
-    "dotenv": "18.0.9",
     "next": "16.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -24,7 +16,6 @@
     "@types/node": "24.10.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
-    "prisma": "8.1.0-dev.9",
     "tsx": "4.21.0",
     "typescript": "5.9.3"
   }
