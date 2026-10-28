@@ -8,3 +8,9 @@ __pycache__/
 reports/*.png
 reports/*.csv
 .DS_Store
+node_modules/
+.next/
+out/
+*.db
+*.db-journal
+*.tsbuildinfo
